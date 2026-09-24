@@ -1,0 +1,117 @@
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#E3ECF7', 'primaryTextColor': '#1A1A1A', 'primaryBorderColor': '#2F5597', 'lineColor': '#5B6B7F', 'tertiaryColor': '#FFFFFF', 'attributeBackgroundColorOdd': '#FFFFFF', 'attributeBackgroundColorEven': '#F2F5FA'}}}%%
+erDiagram
+    PARTY {
+        uuid ucid PK "Клиент"
+        enum party_type "ФЛ / ИП / ЮЛ"
+        string inn
+        string segment_code FK
+        string branch_code FK
+    }
+    PARTICIPATION {
+        uuid participation_id PK "Участие в договоре"
+        uuid ucid FK
+        uuid contract_id FK
+        enum role
+    }
+    CONTRACT {
+        uuid contract_id PK "Договор"
+        string product_code FK
+        string tariff_code FK
+        int tariff_version FK
+        enum bank_legal_entity "FU / RB"
+        enum status
+    }
+    PRODUCT {
+        string product_code PK "Продукт"
+        enum product_type
+    }
+    TARIFF {
+        string tariff_code PK "Тариф"
+        int version PK
+        string product_code FK
+    }
+    ACCOUNT {
+        uuid account_id PK "Счёт"
+        string account_number UK
+        uuid contract_id FK
+        uuid loan_id FK "для ссудных счетов"
+    }
+    DEPOSIT {
+        uuid deposit_id PK "Вклад"
+        uuid contract_id FK
+        uuid account_id FK
+    }
+    LOAN {
+        uuid loan_id PK "Кредит"
+        uuid contract_id FK
+        decimal outstanding_principal
+    }
+    CARD {
+        uuid card_id PK "Карта"
+        string pan_token UK
+        uuid contract_id FK
+        uuid account_id FK
+        uuid holder_ucid FK
+    }
+    PAYMENT {
+        uuid payment_id PK "Платёж"
+        uuid payer_account_id FK
+        enum status
+    }
+    TRANSACTION {
+        uuid transaction_id PK "Транзакция"
+        uuid account_id FK
+        uuid card_id FK
+        uuid payment_id FK
+        timestamp event_ts
+    }
+    CUSTOMER_CASE {
+        uuid case_id PK "Обращение"
+        uuid ucid FK
+        uuid contract_id FK "предмет (опц.)"
+        uuid account_id FK "предмет (опц.)"
+        uuid card_id FK "предмет (опц.)"
+        uuid payment_id FK "предмет (опц.)"
+    }
+    CONSENT {
+        uuid consent_id PK "Согласие"
+        uuid ucid FK
+        enum purpose
+        enum status
+    }
+    BRANCH {
+        string branch_code PK "Подразделение"
+        string parent_branch_code FK
+    }
+    SEGMENT {
+        string segment_code PK "Клиентский сегмент"
+    }
+
+    PARTY ||--o{ PARTICIPATION : "участвует"
+    CONTRACT ||--|{ PARTICIPATION : "имеет стороны"
+    PRODUCT ||--|{ TARIFF : "имеет"
+    PRODUCT ||--o{ CONTRACT : "оформлен по"
+    TARIFF ||--o{ CONTRACT : "применяется к"
+    CONTRACT ||--o{ ACCOUNT : "открывает"
+    CONTRACT ||--o| DEPOSIT : "вклад"
+    CONTRACT ||--o{ LOAN : "кредит"
+    DEPOSIT ||--|| ACCOUNT : "депозитный счёт"
+    LOAN ||--|{ ACCOUNT : "ссудные счета"
+    CONTRACT ||--o{ CARD : "выпускает"
+    ACCOUNT ||--o{ CARD : "привязана"
+    PARTY ||--o{ CARD : "держатель"
+    ACCOUNT ||--o{ PAYMENT : "счёт плательщика"
+    ACCOUNT ||--o{ TRANSACTION : "движение"
+    CARD |o--o{ TRANSACTION : "карточные операции"
+    PAYMENT |o--o{ TRANSACTION : "исполнен"
+    PARTY ||--o{ CUSTOMER_CASE : "обращается"
+    CONTRACT |o--o{ CUSTOMER_CASE : "предмет"
+    ACCOUNT |o--o{ CUSTOMER_CASE : "предмет"
+    CARD |o--o{ CUSTOMER_CASE : "предмет"
+    PAYMENT |o--o{ CUSTOMER_CASE : "предмет"
+    PARTY ||--o{ CONSENT : "даёт"
+    SEGMENT ||--o{ PARTY : "классифицирует"
+    SEGMENT |o--o{ TARIFF : "сегментный тариф"
+    BRANCH ||--o{ PARTY : "обслуживает"
+    BRANCH ||--o{ CONTRACT : "оформляет"
+    BRANCH |o--o{ BRANCH : "подчиняет"
