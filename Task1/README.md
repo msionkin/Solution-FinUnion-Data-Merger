@@ -20,4 +20,4 @@
 | [data-classification.md](data-classification.md) | Категории данных, критичность, влияние на ИБ и средства защиты |
 | [storage-strategy.md](storage-strategy.md) | Типы хранилищ для групп данных |
 | [reference-model.md](reference-model.md) | Маппинг на BIAN, пересечения систем FU и RB, целевые домены данных |
-| [diagrams/logical-data-model.mmd](diagrams/logical-data-model.mmd) | ERD логической модели (Mermaid) |
+| [diagrams/logical-data-model.mmd](diagrams/logical-data-model.mmd) | ERD логической модели: [Mermaid](diagrams/logical-data-model.mmd), [SVG](diagrams/logical-data-model.svg) |

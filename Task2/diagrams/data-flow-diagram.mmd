@@ -1,0 +1,101 @@
+---
+title: DFD уровня 0. Промежуточное состояние через 3 месяца
+config:
+  layout: dagre
+---
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#E3ECF7', 'primaryTextColor': '#1A1A1A', 'secondaryTextColor': '#1A1A1A', 'tertiaryTextColor': '#1A1A1A', 'primaryBorderColor': '#2F5597', 'lineColor': '#595959', 'edgeLabelBackground': '#FFFFFF', 'clusterBkg': '#F7F9FC', 'clusterBorder': '#8FA3BF', 'fontSize': '13px'}}}%%
+flowchart TB
+    Client(["Клиент<br/>(офис, мобильное и веб-приложения)"])
+    Analyst(["Менеджмент и аналитики"])
+    Reg{{"Банк России"}}
+
+    subgraph FU["FinUnion"]
+        FU_CRM["FU CRM"]
+        FU_OPS["<b>Операционные системы FU</b><br/>FU Core Banking<br/>FU Card Processing<br/>FU Loan System"]
+    end
+
+    subgraph RB["RetailBank"]
+        RB_CRM["RB CRM"]
+        RB_OPS["<b>Операционные системы RB</b><br/>RB Core Banking<br/>RB Card Processing<br/>RB Loan System"]
+        RB_DWH[("RB DWH<br/>только регуляторная<br/>отчётность RB")]
+    end
+
+    subgraph INT["Интеграция и мастер-данные"]
+        IL(["Integration Layer<br/>Передать, проверить схему, маршрутизировать<br/>FU ESB · Kafka · Debezium CDC · Schema Registry"])
+        MDM(["MDM (Customer Hub + Reference Data)<br/>Сопоставить, дедуплицировать,<br/>вести золотую запись и справочники"])
+        MDM_DB[("Золотые записи клиентов, UCID,<br/>справочники продуктов, тарифов,<br/>подразделений, сегментов")]
+    end
+
+    subgraph ANL["Аналитический контур"]
+        ETL(["ETL FU DWH<br/>Проверить, обогатить UCID<br/>и едиными кодами, агрегировать"])
+        DWH[("FU DWH<br/>единая управленческая отчётность<br/>+ регуляторная отчётность FU")]
+        BI["FU BI"]
+    end
+
+    DH["DataHub<br/>каталог данных, владельцы, lineage"]
+
+    Legend["Действие указано в подписи стрелки<br/>C Create · R Read · U Update · D Delete (логическое)<br/>E Enrich · V Validate · A Aggregate"]
+
+    %% 0-3 ввод данных и существующие операционные потоки
+    Client -->|"Анкета, согласия, обращения [C/U]"| FU_CRM
+    Client -->|"Анкета, согласия, обращения [C/U]"| RB_CRM
+    FU_CRM -->|"F18 Заявки, договоры через ESB [C]"| FU_OPS
+    RB_CRM -->|"F18 Заявки, договоры, P2P as-is [C]"| RB_OPS
+
+    %% 4-7 захват изменений в Integration Layer
+    FU_CRM -->|"F01, F08 Клиент, согласия, CDC [C/U]"| IL
+    RB_CRM -->|"F02, F08 Клиент, согласия, CDC [C/U]"| IL
+    FU_OPS -->|"F03 Клиенты АБС, CDC [R]"| IL
+    RB_OPS -->|"F03, F09, F11 Клиенты, договоры, счета, карты,<br/>кредиты, платежи, проводки, CDC [C/U]"| IL
+
+    %% 8-11 MDM
+    IL -->|"F01, F02, F03, F08 Клиент, согласия:<br/>проверка схемы и формата [V]"| MDM
+    FU_CRM -->|"F04 Поиск клиента перед заведением,<br/>синхронный REST через ESB [R]"| MDM
+    MDM -->|"Золотая запись, слияние дублей [C/U/D]"| MDM_DB
+    MDM -->|"F05, F06, F07, F12 Золотая запись, UCID,<br/>справочники [U/E]"| IL
+
+    %% 12-15 публикация эталонных данных
+    IL -->|"F05 Золотая запись, дубли [U/D]<br/>F08 Отзыв согласий [D]<br/>F09 Продукты клиента RB [E]"| FU_CRM
+    IL -->|"F05 Золотая запись, дубли [U/D]<br/>F08 Отзыв согласий [D]"| RB_CRM
+    IL -->|"F06, F07 UCID, справочники [U/E]"| FU_OPS
+    IL -->|"F06, F07 UCID, справочники [U/E]"| RB_OPS
+
+    %% 16-19 загрузка в DWH
+    IL -->|"F08, F11, F12 Данные RB, клиент,<br/>согласия, справочники [R]"| ETL
+    FU_OPS -->|"F10 Договоры, счета, платежи, проводки,<br/>batch T+1 с реплик [R]"| ETL
+    RB_DWH -->|"F13 История RB, разовая загрузка [R]"| ETL
+    ETL -->|"Проверенные данные с UCID [V/E/C]"| DWH
+
+    %% 20-24 отчётность
+    DWH -->|"F14 Витрины: клиенты, счета,<br/>продукты, операции [A]"| BI
+    BI -->|"Единая управленческая отчётность [R]"| Analyst
+    DWH -->|"F15 Регуляторная отчётность FU, XML [A]"| Reg
+    RB_OPS -->|"Batch as-is [C]"| RB_DWH
+    RB_DWH -->|"F16 Регуляторная отчётность RB, XML [A]"| Reg
+
+    %% 25-28 метаданные и lineage
+    IL -->|"F17 Метаданные: схемы, топики"| DH
+    MDM -->|"F17 Метаданные, DQ"| DH
+    ETL -->|"F17 Метаданные: lineage, DQ"| DH
+    BI -->|"F17 Метаданные отчётов"| DH
+
+    classDef system fill:#E3ECF7,stroke:#2F5597,color:#1A1A1A
+    classDef legacy fill:#F6E3D8,stroke:#B5651D,color:#1A1A1A
+    classDef process fill:#FFF2CC,stroke:#B8860B,color:#1A1A1A,stroke-width:2px
+    classDef store fill:#DDEBD3,stroke:#4F7A38,color:#1A1A1A
+    classDef actor fill:#E6E6E6,stroke:#6F6F6F,color:#1A1A1A
+    classDef regulator fill:#FFE45C,stroke:#B89B00,color:#1A1A1A
+    classDef note fill:#FFFFFF,stroke:#8A8A8A,color:#1A1A1A,stroke-dasharray:4 3
+    class FU_CRM,FU_OPS,BI,DH system
+    class RB_CRM,RB_OPS legacy
+    class IL,MDM,ETL process
+    class MDM_DB,DWH,RB_DWH store
+    class Client,Analyst actor
+    class Reg regulator
+    class Legend note
+    style FU fill:#F4F7FB,stroke:#2F5597,color:#1A1A1A
+    style RB fill:#FBF3EE,stroke:#B5651D,color:#1A1A1A
+    style INT fill:#FFFBEB,stroke:#B8860B,color:#1A1A1A
+    style ANL fill:#F1F7EC,stroke:#4F7A38,color:#1A1A1A
+
+    linkStyle default stroke:#595959,stroke-width:1.5px
