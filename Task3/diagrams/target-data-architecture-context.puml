@@ -1,0 +1,38 @@
+@startuml target-data-architecture-context
+!include <C4/C4_Context>
+
+title Целевая архитектура данных FinUnion (12 месяцев). C4, уровень 1: System Context
+
+AddElementTag("legacy", $bgColor="#B5651D", $borderColor="#7A4414", $fontColor="#FFFFFF", $legendText="выводится из эксплуатации")
+AddElementTag("cloud", $bgColor="#7B4FA0", $borderColor="#4F2F6B", $fontColor="#FFFFFF", $legendText="облако, вне периметра банка")
+
+Person(client, "Клиент", "ФЛ, ИП, ЮЛ: офис, мобильное и веб-приложения")
+Person(employee, "Сотрудник фронт-офиса", "Менеджер, оператор контакт-центра")
+Person(analyst, "Менеджмент и аналитики", "Управленческая отчётность, BI")
+Person(risk, "Риск-менеджмент и антифрод", "Скоринг, модели, расследования")
+Person(steward, "Data Office", "Владельцы и стюарды данных")
+
+Enterprise_Boundary(fu, "FinUnion Group, on-prem") {
+    System(ops, "Операционные банковские системы", "FU CRM, FU Core Banking, FU Card Processing, FU Loan System, Consent Management. OLTP, мастер-системы операционных данных")
+    System(mdmint, "MDM и Integration Layer", "MDM (Customer Hub + Reference Data), FU ESB, Kafka + Debezium CDC + Schema Registry")
+    System(platform, "Аналитическая платформа данных", "Data Lakehouse, DWH, BI, оркестрация, каталог данных")
+}
+
+System_Ext(rb, "Системы RetailBank", "RB CRM, Core, Cards, Loans, DWH", $tags="legacy")
+System_Ext(cbr, "Банк России", "Приём регуляторной отчётности")
+System_Ext(sandbox, "ML-песочница", "Эксперименты и обучение моделей", $tags="cloud")
+
+Rel(client, ops, "Заявки, платежи, согласия, обращения")
+Rel(employee, ops, "Работа с клиентом")
+Rel(ops, mdmint, "Изменения данных (CDC), поиск и изменение клиента")
+Rel(mdmint, ops, "Золотая запись, UCID, справочники, отзыв согласий")
+Rel(mdmint, platform, "CDC-события и мастер-данные", "Kafka, Avro")
+Rel(rb, platform, "История перед выводом систем, разово", "Parquet, CSV")
+Rel(platform, cbr, "Регуляторная отчётность", "XML по XSD Банка России")
+Rel(platform, sandbox, "Только анонимизированные наборы")
+Rel(analyst, platform, "Отчёты и дашборды")
+Rel(risk, platform, "Данные для скоринга и антифрода")
+Rel(steward, platform, "Каталог, владельцы, качество данных")
+
+SHOW_LEGEND()
+@enduml

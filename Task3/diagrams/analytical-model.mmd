@@ -1,0 +1,96 @@
+---
+title: Схема «звезда» — операции по счетам и картам
+---
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#E3ECF7', 'primaryTextColor': '#1A1A1A', 'primaryBorderColor': '#2F5597', 'lineColor': '#5B6B7F', 'tertiaryColor': '#FFFFFF', 'attributeBackgroundColorOdd': '#FFFFFF', 'attributeBackgroundColorEven': '#F2F5FA'}}}%%
+erDiagram
+    FACT_TRANSACTIONS {
+        string transaction_id PK "источник + ID операции"
+        int operation_date_key FK
+        int posting_date_key FK
+        bigint customer_key FK
+        bigint account_key FK
+        bigint card_key FK "-1 для некарточных"
+        bigint product_key FK
+        bigint branch_key FK
+        bigint segment_key FK
+        int channel_key FK
+        int operation_type_key FK
+        int currency_key FK
+        decimal amount "в валюте операции"
+        decimal amount_rub
+        decimal fee_amount_rub
+        boolean is_reversal
+        timestamp event_ts
+        timestamp load_ts
+    }
+    DIM_DATE {
+        int date_key PK
+        date calendar_date
+        string month_quarter_year
+        boolean is_business_day
+    }
+    DIM_CUSTOMER {
+        bigint customer_key PK
+        string ucid_pseudo "псевдоним UCID"
+        string party_type "ФЛ / ИП / ЮЛ"
+        string age_group
+        string region
+        boolean is_ex_retailbank
+    }
+    DIM_ACCOUNT {
+        bigint account_key PK
+        string account_number_masked
+        string balance_account
+        string source_bank "FU / RB"
+        string status
+    }
+    DIM_CARD {
+        bigint card_key PK
+        string pan_token
+        string pan_masked
+        string card_type
+        string payment_system
+    }
+    DIM_PRODUCT {
+        bigint product_key PK
+        string product_code "код FU"
+        string product_type
+        string business_line
+    }
+    DIM_BRANCH {
+        bigint branch_key PK
+        string branch_code
+        string branch_type
+        string filial
+        string region
+    }
+    DIM_SEGMENT {
+        bigint segment_key PK
+        string segment_code
+        string business_line
+    }
+    DIM_CHANNEL {
+        int channel_key PK
+        string channel "офис, МП, веб, банкомат, POS"
+    }
+    DIM_OPERATION_TYPE {
+        int operation_type_key PK
+        string operation_group
+        string direction "дебет / кредит"
+    }
+    DIM_CURRENCY {
+        int currency_key PK
+        string iso_code
+    }
+
+    DIM_DATE ||--o{ FACT_TRANSACTIONS : "operation_date_key"
+    DIM_DATE ||--o{ FACT_TRANSACTIONS : "posting_date_key"
+    DIM_CUSTOMER ||--o{ FACT_TRANSACTIONS : "клиент"
+    DIM_ACCOUNT ||--o{ FACT_TRANSACTIONS : "счёт"
+    DIM_CARD ||--o{ FACT_TRANSACTIONS : "карта"
+    DIM_PRODUCT ||--o{ FACT_TRANSACTIONS : "продукт"
+    DIM_BRANCH ||--o{ FACT_TRANSACTIONS : "подразделение"
+    DIM_SEGMENT ||--o{ FACT_TRANSACTIONS : "сегмент на дату"
+    DIM_CHANNEL ||--o{ FACT_TRANSACTIONS : "канал"
+    DIM_OPERATION_TYPE ||--o{ FACT_TRANSACTIONS : "тип операции"
+    DIM_CURRENCY ||--o{ FACT_TRANSACTIONS : "валюта"
