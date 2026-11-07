@@ -1,0 +1,99 @@
+@startuml target-data-architecture-container
+!include <C4/C4_Container>
+
+title Целевая архитектура данных FinUnion (12 месяцев). C4, уровень 2: Container
+
+AddElementTag("legacy", $bgColor="#B5651D", $borderColor="#7A4414", $fontColor="#FFFFFF", $legendText="выводится из эксплуатации")
+AddElementTag("cloud", $bgColor="#7B4FA0", $borderColor="#4F2F6B", $fontColor="#FFFFFF", $legendText="облако, вне периметра банка")
+
+Person(client, "Клиент", "Офис, мобильное и веб-приложения")
+Person(employee, "Сотрудник фронт-офиса")
+Person(analyst, "Менеджмент и аналитики")
+Person(risk, "Риск-менеджмент и антифрод")
+Person(steward, "Data Office")
+
+System_Boundary(ops, "Операционные банковские системы (OLTP)") {
+    Container(crm, "FU CRM", "CRM", "Заявки, обращения, работа с клиентом")
+    Container(core, "FU Core Banking", "АБС", "Договоры, счета, вклады, платежи, проводки")
+    Container(cards, "FU Card Processing", "Процессинг, PCI-зона", "Карты, авторизации, клиринг. Наружу — только токен")
+    Container(loans, "FU Loan System", "Кредитная система", "Кредиты, графики, просрочка")
+    Container(consent, "Consent Management", "Контур согласий", "Согласия с неизменяемой историей")
+}
+
+System_Boundary(mdmint, "MDM и Integration Layer") {
+    Container(mdm, "MDM", "Customer Hub + Reference Data, режим centralized", "Золотая запись клиента, UCID, справочники продуктов, тарифов, подразделений, сегментов")
+    Container(esb, "FU ESB", "REST / SOAP", "Синхронные вызовы, конвертация форматов")
+    Container(cdc, "Debezium CDC", "Kafka Connect", "Читает журналы транзакций OLTP-баз")
+    ContainerQueue(kafka, "Kafka", "Apache Kafka", "Топики по доменам, DLQ")
+    Container(sr, "Schema Registry", "Avro", "Контракты схем событий")
+}
+
+System_Boundary(platform, "Аналитическая платформа данных (OLAP)") {
+    Container(sink, "Iceberg Sink", "Kafka Connect", "Потоковая запись событий в Bronze")
+    ContainerDb(lake, "Data Lakehouse", "S3 на Ceph + Apache Iceberg", "Bronze / Silver / Gold, архив RB, WORM-бакеты")
+    ContainerDb(catalog, "Каталог Iceberg", "Iceberg REST Catalog", "Текущие снимки таблиц, ветки загрузок")
+    Container(spark, "Spark", "Apache Spark", "Очистка, дедупликация, UCID, псевдонимизация, загрузка DWH, архивы")
+    Container(vault, "Сервис токенизации", "Vault", "Ключи псевдонимизации отдельно от данных")
+    Container(trino, "Trino", "Распределённый SQL", "SQL-доступ к Iceberg")
+    ContainerDb(dwh, "DWH", "PostgreSQL", "staging → core → marts; операции за 2 года, остатки и агрегаты за всю историю")
+    Container(bi, "FU BI", "BI + семантический слой", "Дашборды, единые метрики")
+    Container(airflow, "Airflow", "Apache Airflow", "Оркестрация batch-пайплайнов")
+    Container(dbt, "dbt + Great Expectations", "SQL-модели, проверки", "Модели DWH и Gold, тесты качества")
+    Container(datahub, "DataHub", "Каталог данных", "Метаданные, владельцы, lineage, результаты DQ")
+}
+
+System_Ext(rb, "Системы RetailBank", "Выгрузки перед выводом", $tags="legacy")
+System_Ext(cbr, "Банк России", "Регуляторная отчётность")
+System_Ext(sandbox, "ML-песочница", "Облако", $tags="cloud")
+
+' Операционный контур
+Rel(client, crm, "Заявки, анкеты, согласия")
+Rel(client, core, "Платежи, операции")
+Rel(employee, crm, "Работа с клиентом")
+Rel(crm, esb, "Заявки, поиск и изменение клиента", "REST / SOAP")
+Rel(esb, mdm, "API клиента", "REST")
+Rel(esb, core, "Открытие договоров", "SOAP")
+Rel(esb, loans, "Кредитные заявки", "SOAP")
+Rel(crm, consent, "Согласия", "REST")
+
+' CDC и события
+Rel(core, cdc, "Изменения договоров, счетов, проводок", "CDC")
+Rel(cards, cdc, "Карты, операции (токен)", "CDC")
+Rel(loans, cdc, "Кредиты", "CDC")
+Rel(crm, cdc, "Обращения", "CDC")
+Rel(consent, cdc, "Согласия, отзывы", "CDC")
+Rel(cdc, kafka, "События изменений", "Avro")
+Rel(mdm, kafka, "Золотая запись, UCID, справочники", "Avro")
+Rel_U(kafka, sr, "Проверка схем")
+Rel(kafka, core, "UCID, справочники", "Avro")
+Rel(kafka, crm, "Золотая запись, отзыв согласий", "Avro")
+
+' Аналитическая платформа
+Rel(kafka, sink, "События", "Avro")
+Rel(sink, lake, "Запись в Bronze", "Parquet")
+Rel(rb, spark, "История, разово", "Parquet, CSV")
+Rel(spark, lake, "Bronze → Silver → Gold, архив RB", "Iceberg")
+Rel(spark, vault, "Псевдонимизация ПДн")
+Rel(spark, dwh, "Подготовленные данные T+1", "JDBC")
+Rel(spark, sandbox, "Анонимизированные наборы")
+Rel(lake, catalog, "Снимки таблиц")
+Rel(trino, lake, "Чтение таблиц", "Iceberg")
+Rel(airflow, spark, "Запуск заданий")
+Rel(airflow, dbt, "Запуск моделей и проверок")
+Rel(dbt, dwh, "SQL-модели core и витрин", "SQL")
+Rel(dbt, trino, "SQL-модели Gold", "SQL")
+Rel(bi, dwh, "Витрины", "SQL")
+Rel(bi, trino, "Gold и история", "SQL")
+Rel(dwh, cbr, "Регуляторная отчётность", "XML")
+
+' Пользователи и метаданные
+Rel(analyst, bi, "Отчёты и дашборды")
+Rel(risk, trino, "Скоринг, антифрод", "SQL")
+Rel(steward, datahub, "Владельцы, глоссарий, качество")
+Rel(airflow, datahub, "Lineage пайплайнов и dbt", "OpenLineage")
+Rel(datahub, sr, "Схемы топиков")
+Rel(datahub, trino, "Метаданные Iceberg")
+Rel(datahub, dwh, "Метаданные DWH")
+
+SHOW_LEGEND()
+@enduml

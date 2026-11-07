@@ -1,0 +1,32 @@
+%%{init: {"theme": "base", "themeVariables": {"background": "#FFFFFF", "primaryColor": "#B5C493", "primaryBorderColor": "#4F5E33", "primaryTextColor": "#1E2A12", "sectionBkgColor": "#F3F5EC", "altSectionBkgColor": "#FFFFFF", "sectionBkgColor2": "#F3F5EC", "taskBkgColor": "#B5C493", "taskBorderColor": "#4F5E33", "taskTextColor": "#1E2A12", "taskTextOutsideColor": "#1E2A12", "taskTextLightColor": "#1E2A12", "taskTextDarkColor": "#1E2A12", "critBkgColor": "#E07A5F", "critBorderColor": "#8C3B26", "gridColor": "#BFBFBF", "todayLineColor": "#FFFFFF", "titleColor": "#1E1E1E", "fontSize": "14px"}}}%%
+gantt
+    title План миграции FinUnion + RetailBank (месяцы 1–12)
+    dateFormat YYYY-MM-DD
+    axisFormat М%m
+    tickInterval 1month
+
+    section Подготовка
+    0. Data discovery                           :s0, 2001-01-01, 30d
+    1. Промежуточный контур (MDM coexistence, CDC, FU DWH) :s1, 2001-01-01, 90d
+    Промежуточное состояние                     :milestone, m3, 2001-03-31, 0d
+
+    section Мастер-данные и отчётность
+    2. Consent Management, отчётность RB из DWH :s2, 2001-04-01, 91d
+    7. Cutover клиентских данных (MDM centralized) :crit, s7, 2001-10-01, 31d
+
+    section Платформа данных
+    3. Пилот Lakehouse (Trial), перенос FU Data Lake :s3, 2001-04-01, 91d
+    6. Lakehouse в эксплуатации, DWH из Silver, data-продукты :s6, 2001-06-01, 92d
+
+    section Перенос портфелей RB
+    4. Подготовка переноса, пробные прогоны     :s4, 2001-05-01, 61d
+    5. Волны переноса портфелей RB              :s5, 2001-06-15, 107d
+    W1. Пилотная когорта                       :crit, w1, 2001-06-15, 30d
+    W2. ФЛ по регионам                          :crit, w2, 2001-07-15, 45d
+    W3. МСБ                                     :crit, w3, 2001-08-20, 40d
+    Юридическое присоединение RB                :milestone, m9, 2001-09-30, 0d
+
+    section Вывод legacy
+    Точка необратимости cutover          :milestone, pnr, 2001-10-18, 0d
+    8. Архив RB, вывод систем RB и FU Data Lake :s8, 2001-10-18, 71d
+    Целевое состояние                           :milestone, m12, 2001-12-28, 0d
